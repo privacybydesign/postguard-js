@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 
 import { compareRules } from './lib/ruleset-drift.mjs';
 
-const REPO = 'encryption4all/postguard-js';
+const REPO = 'privacybydesign/postguard-js';
 const RULES_URL = `https://api.github.com/repos/${REPO}/rules/branches/main`;
 
 /** Walked up from this file, the same way ci-wiring.test.ts finds `.github`. */

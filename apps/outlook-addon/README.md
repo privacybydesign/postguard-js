@@ -41,7 +41,7 @@ repo, which is archived — there is no `master` branch and no `Release` workflo
    `manifest.xml`'s `<Version>`.
 2. Merging the `Version Packages` PR lands the bumped version on `main`.
 3. Pushing the app-scoped tag `outlook-addin-vX.Y.Z` builds and pushes the production
-   Docker image to `ghcr.io/encryption4all/postguard-outlook-addon:X.Y.Z`, and creates the
+   Docker image to `ghcr.io/privacybydesign/postguard-outlook-addon:X.Y.Z`, and creates the
    GitHub Release carrying `manifest.xml` as a sideloadable asset.
 
 The tag is `outlook-addin-v*`, never `vX.Y.Z`: this repo's tag namespace is shared with

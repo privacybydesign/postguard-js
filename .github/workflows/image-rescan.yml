@@ -1,0 +1,32 @@
+# Weekly re-scan of the PUBLISHED images (all platforms) for new CVEs. The
+# builds in website.yml and outlook-addon.yml do not scan, so this is the only
+# vulnerability scan these two images get.
+name: Image rescan
+
+on:
+    schedule:
+        - cron: '23 6 * * 1' # Mondays
+    workflow_dispatch:
+
+permissions: {}
+
+jobs:
+    website:
+        uses: privacybydesign/github-workflows/.github/workflows/image-rescan.yml@v1
+        permissions:
+            contents: read
+            packages: read
+            security-events: write
+        with:
+            image-name: ghcr.io/privacybydesign/postguard-website
+            tags: edge
+
+    outlook-addon:
+        uses: privacybydesign/github-workflows/.github/workflows/image-rescan.yml@v1
+        permissions:
+            contents: read
+            packages: read
+            security-events: write
+        with:
+            image-name: ghcr.io/privacybydesign/postguard-outlook-addon
+            tags: edge

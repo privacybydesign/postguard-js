@@ -77,7 +77,7 @@ services:
 
     # PostGuard website
     postguard-website:
-        image: ghcr.io/encryption4all/postguard-website:edge
+        image: ghcr.io/privacybydesign/postguard-website:edge
         pull_policy: always
         container_name: postguard-website-prod
         ports:

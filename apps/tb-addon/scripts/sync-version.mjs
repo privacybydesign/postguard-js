@@ -12,7 +12,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 const check = process.argv.includes("--check");
 const ADDON_ID = "pg4tb@e4a.org";
-const REPO = "encryption4all/postguard-js";
+const REPO = "privacybydesign/postguard-js";
 
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 const { version } = pkg;

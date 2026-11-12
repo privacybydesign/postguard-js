@@ -62,7 +62,7 @@
  * That the ruleset still lists these contexts, and who may still bypass them,
  * lives in GitHub's API:
  *
- *     gh api repos/encryption4all/postguard-js/rules/branches/main
+ *     gh api repos/privacybydesign/postguard-js/rules/branches/main
  *
  * No test runner can call it. `REQUIRED_CONTEXTS` below is this side of that
  * link; keep the two in step, and when you rename a job, rename the context in
@@ -125,7 +125,7 @@ const workflowDir = (() => {
  * file to catch drift in the *live* ruleset) is against a set, never a
  * sequence:
  *
- *     gh api repos/encryption4all/postguard-js/rules/branches/main \
+ *     gh api repos/privacybydesign/postguard-js/rules/branches/main \
  *       -q '.[] | select(.type=="required_status_checks")
  *            | .parameters.required_status_checks[].context'
  *
@@ -381,7 +381,7 @@ describe('required contexts', () => {
           'time(s). A required context no job produces blocks nothing, so renaming a job ' +
           'disarms its gate instead of breaking it; two jobs producing one context are ' +
           'indistinguishable to branch protection. Rename the context in the same change ' +
-          '(`gh api repos/encryption4all/postguard-js/rules/branches/main`).'
+          '(`gh api repos/privacybydesign/postguard-js/rules/branches/main`).'
       ).toHaveLength(1);
     }
   });
@@ -592,10 +592,10 @@ describe('release and publish wiring', () => {
    */
   it('the published image names are the ones ops deploys', () => {
     expect(workflow('website.yml').triggers).toContain(
-      'IMAGE: ghcr.io/encryption4all/postguard-website'
+      'IMAGE: ghcr.io/privacybydesign/postguard-website'
     );
     expect(workflow('outlook-addon.yml').triggers).toContain(
-      'IMAGE: ghcr.io/encryption4all/postguard-outlook-addon'
+      'IMAGE: ghcr.io/privacybydesign/postguard-outlook-addon'
     );
     for (const file of ['website.yml', 'outlook-addon.yml']) {
       expect(

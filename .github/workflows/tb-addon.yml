@@ -33,12 +33,16 @@ jobs:
         outputs:
             version: ${{ steps.version.outputs.value }}
         steps:
-            - uses: actions/checkout@v6
-            - uses: pnpm/action-setup@v4
-            - uses: actions/setup-node@v6
+            - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+              with:
+                  persist-credentials: false
+            - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+            - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
               with:
                   node-version: 24
-                  cache: pnpm
+                  package-manager-cache: false
+                  # No dependency cache: this workflow also runs on a release tag, and a
+                  # cache a pull request can write must not feed a release build.
             - run: pnpm install --frozen-lockfile
               working-directory: .
 
@@ -83,7 +87,7 @@ jobs:
               run: cd dist && zip -qr "../postguard-tb-addon-${{ steps.version.outputs.value }}.xpi" .
 
             - name: Upload build artifacts
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   name: postguard-tb-addon-${{ steps.version.outputs.value }}
                   path: |
@@ -99,7 +103,9 @@ jobs:
         permissions:
             contents: write
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+              with:
+                  persist-credentials: false
 
             # The tag is the release's identity, so it has to agree with what the
             # build produced; a mismatch means the version bump and the tag came
@@ -115,7 +121,7 @@ jobs:
                   echo "tag and package agree on $built"
 
             - name: Download artifact
-              uses: actions/download-artifact@v8
+              uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
               with:
                   name: postguard-tb-addon-${{ needs.build.outputs.version }}
                   path: apps/tb-addon

@@ -8,7 +8,7 @@
     "gecko": {
       "id": "pg4tb@e4a.org",
       "strict_min_version": "128.0",
-      "update_url": "https://raw.githubusercontent.com/encryption4all/postguard-js/main/apps/tb-addon/updates.json"
+      "update_url": "https://raw.githubusercontent.com/privacybydesign/postguard-js/main/apps/tb-addon/updates.json"
     }
   },
   "background": {
