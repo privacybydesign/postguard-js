@@ -2,7 +2,7 @@
 # apps/website: the site depends on @e4a/pg-js as `workspace:*`, so the whole
 # workspace has to be installed for that link to resolve (same reason as
 # docker/Dockerfile).
-FROM node:24-alpine
+FROM node:25-alpine
 
 RUN corepack enable
 WORKDIR /repo
