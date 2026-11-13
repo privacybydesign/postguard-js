@@ -13,7 +13,7 @@ ARG NGINX_VERSION=1.30.2
 # Runs on the build platform, not the target: the output is static files, the
 # same for every architecture, so the arm64 image does not need an emulated
 # Node build.
-FROM --platform=$BUILDPLATFORM node:24-slim AS frontend
+FROM --platform=$BUILDPLATFORM node:25-slim AS frontend
 RUN corepack enable
 WORKDIR /repo
 
