@@ -59,8 +59,6 @@ package_dir() {
 }
 
 version_pr() {
-    git config user.name 'github-actions[bot]'
-    git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
     git switch -C "$BRANCH"
     pnpm version-packages
 
@@ -123,6 +121,11 @@ case "${1:-}" in
     '')
         : "${GITHUB_TOKEN:?GITHUB_TOKEN must be set}"
         export GH_TOKEN=$GITHUB_TOKEN
+        # Both flows need an identity: the version commit, and the annotated
+        # tags `changeset publish` creates. Without one the tag fails while
+        # publish still exits 0 and prints "New tag:", after the npm publish.
+        git config user.name 'github-actions[bot]'
+        git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
         if pending; then version_pr; else publish; fi
         ;;
     *)
