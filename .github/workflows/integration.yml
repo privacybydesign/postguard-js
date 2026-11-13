@@ -64,6 +64,12 @@ jobs:
             - name: Prettier plugins resolve from the root
               run: pnpm check-prettier-plugins
 
+            # Delivery's release step is this script, and Delivery only runs on
+            # main. Its parsing is held to fixtures here so a break shows up on
+            # the pull request and not on the release.
+            - name: Release script self-test
+              run: scripts/changesets-release-test.sh
+
             # `.husky/pre-commit` runs lint-staged over packages/pg-js, but a hook
             # only ever sees staged files and `--no-verify` skips it entirely, so
             # without this step the SDK's formatting rule is a convention rather
