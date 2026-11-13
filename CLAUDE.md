@@ -12,7 +12,7 @@ a Private Key Generator and receives a decryption key. This repo is the JS monor
   that is published to npm.
 - `apps/website` — the SvelteKit app where people encrypt files and send them using
   Yivi identity attributes. `website.yml` publishes
-  `ghcr.io/encryption4all/postguard-website` from here; the app's history is in the
+  `ghcr.io/privacybydesign/postguard-website` from here; the app's history is in the
   archived `encryption4all/postguard-website` and not in this repo's log.
 - `apps/tb-addon`, `apps/outlook-addon` — the Thunderbird and Outlook mail addons,
   imported from their own repos per postguard-js#123, which is still open.

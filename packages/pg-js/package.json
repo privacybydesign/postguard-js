@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/encryption4all/postguard-js.git",
+    "url": "git+https://github.com/privacybydesign/postguard-js.git",
     "directory": "packages/pg-js"
   },
   "main": "./dist/index.mjs",

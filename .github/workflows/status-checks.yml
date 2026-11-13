@@ -1,0 +1,50 @@
+# The org-wide gate. privacybydesign's ruleset requires one context on every
+# repository, `Status checks passed`, and this workflow is what produces it.
+#
+# It carries only the checks the shared workflows add: dependency review and
+# the workflow lint (actionlint + zizmor). The repo's own gates stay where they
+# are, in integration.yml and the per-app workflows, and stay required by name
+# through the `main` ruleset and .github/required-rules.json. They are not
+# pulled in here: a job called through `uses:` reports as `<caller> / <job>`,
+# which would rename all twenty required contexts at once.
+name: Status checks
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+    merge_group:
+    workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+    cancel-in-progress: true
+
+jobs:
+    dependency-review:
+        uses: privacybydesign/github-workflows/.github/workflows/dependency-review.yml@v1
+        permissions:
+            contents: read
+            pull-requests: write
+
+    workflow-lint:
+        uses: privacybydesign/github-workflows/.github/workflows/workflow-lint.yml@v1
+        permissions:
+            contents: read
+
+    passed:
+        name: Status checks passed
+        if: always()
+        needs: [dependency-review, workflow-lint]
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        permissions: {}
+        steps:
+            - name: All required jobs succeeded
+              env:
+                  RESULTS: ${{ toJSON(needs.*.result) }}
+              run: |
+                  echo "$RESULTS"
+                  if grep -qE '"(failure|cancelled)"' <<< "$RESULTS"; then exit 1; fi

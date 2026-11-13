@@ -45,7 +45,7 @@ under `[package.metadata.wasm-pack.profile.release]`).
 ## Reproducing the bundled JavaScript
 
 ```bash
-git clone https://github.com/encryption4all/postguard-js
+git clone https://github.com/privacybydesign/postguard-js
 cd postguard-js
 git checkout tb-addon-v<X.Y.Z>       # the published add-on version's tag
 pnpm install --frozen-lockfile       # respects pnpm-lock.yaml byte-for-byte
@@ -131,7 +131,7 @@ following into the _Notes for reviewers_ field, with the relevant tag
 and hashes filled in:
 
 ```text
-Source: https://github.com/encryption4all/postguard-js (tag tb-addon-v<X.Y.Z>)
+Source: https://github.com/privacybydesign/postguard-js (tag tb-addon-v<X.Y.Z>)
 Build: pnpm install --frozen-lockfile && cd apps/tb-addon && cp .env.example .env && pnpm build && pnpm package
 
 Embedded WebAssembly:
