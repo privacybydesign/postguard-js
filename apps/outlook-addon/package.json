@@ -44,7 +44,7 @@
     "@typescript-eslint/parser": "^8.46.4",
     "babel-loader": "^10.1.1",
     "copy-webpack-plugin": "^14.0.0",
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.9",
     "eslint": "^9.39.5",
     "eslint-plugin-office-addins": "^4.0.9",
     "file-loader": "^6.2.0",
