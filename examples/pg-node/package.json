@@ -18,7 +18,7 @@
     "@e4a/pg-js": "workspace:*"
   },
   "devDependencies": {
-    "prettier": "^3.9.6"
+    "prettier": "^3.9.10"
   },
   "engines": {
     "node": ">=22"
