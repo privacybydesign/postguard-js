@@ -2,7 +2,7 @@
 # @e4a/pg-js as `workspace:*`, so the whole workspace has to be installed for
 # that link to resolve.
 ## Build stage ##############################################################
-FROM node:24-alpine AS build
+FROM node:25-alpine AS build
 
 WORKDIR /repo
 
@@ -46,7 +46,7 @@ RUN pnpm --filter @e4a/pg-js build \
  && pnpm --filter postguard-outlook-addin build
 
 ## Runtime stage ############################################################
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.29-alpine AS runtime
 
 COPY apps/outlook-addon/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /repo/apps/outlook-addon/dist /usr/share/nginx/html

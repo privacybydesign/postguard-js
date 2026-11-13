@@ -9,7 +9,7 @@ ARG NGINX_VERSION=1.27.4
 # Build context is the REPO ROOT, not apps/website: the site depends on
 # @e4a/pg-js as `workspace:*`, so the SDK has to be installed and built here
 # rather than fetched from npm.
-FROM node:24-slim AS frontend
+FROM node:25-slim AS frontend
 RUN corepack enable
 WORKDIR /repo
 
