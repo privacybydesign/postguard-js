@@ -1,12 +1,13 @@
 # The org-wide gate. privacybydesign's ruleset requires one context on every
 # repository, `Status checks passed`, and this workflow is what produces it.
 #
-# It carries only the checks the shared workflows add: dependency review and
-# the workflow lint (actionlint + zizmor). The repo's own gates stay where they
-# are, in integration.yml and the per-app workflows, and stay required by name
-# through the `main` ruleset and .github/required-rules.json. They are not
-# pulled in here: a job called through `uses:` reports as `<caller> / <job>`,
-# which would rename all twenty required contexts at once.
+# It carries only the checks the shared workflows add: dependency review, the
+# workflow lint (actionlint + zizmor) and a build and scan of the two images.
+# The repo's own gates stay where they are, in integration.yml and the per-app
+# workflows, and stay required by name through the `main` ruleset and
+# .github/required-rules.json. They are not pulled in here: a job called
+# through `uses:` reports as `<caller> / <job>`, which would rename every
+# required context at once.
 name: Status checks
 
 on:
@@ -34,10 +35,48 @@ jobs:
         permissions:
             contents: read
 
+    # The two images, built and scanned without a registry write. The per-app
+    # workflows publish them from main through the same shared workflow.
+    website-image:
+        uses: privacybydesign/github-workflows/.github/workflows/docker-publish.yml@v1
+        permissions:
+            contents: read
+            packages: write
+            security-events: write
+            id-token: write
+            attestations: write
+        with:
+            image-name: ghcr.io/privacybydesign/postguard-website
+            dockerfile: apps/website/docker/Dockerfile
+            push-image: false
+
+    # Production values: the build refuses staging fallbacks in production mode,
+    # and the manifest transform fails when an <AppDomain> the target needs is
+    # absent, so these are the values worth exercising. They repeat the PROD_*
+    # values in outlook-addon.yml; packages/pg-js/tests/ci-wiring.test.ts holds
+    # the two in step.
+    outlook-addon-image:
+        uses: privacybydesign/github-workflows/.github/workflows/docker-publish.yml@v1
+        permissions:
+            contents: read
+            packages: write
+            security-events: write
+            id-token: write
+            attestations: write
+        with:
+            image-name: ghcr.io/privacybydesign/postguard-outlook-addon
+            dockerfile: apps/outlook-addon/Dockerfile
+            push-image: false
+            build-args: |
+                ADDIN_PUBLIC_URL=https://addin.postguard.eu/
+                PKG_URL=https://postguard.eu/pkg
+                CRYPTIFY_URL=https://storage.postguard.eu
+                POSTGUARD_WEBSITE_URL=https://postguard.eu
+
     passed:
         name: Status checks passed
         if: always()
-        needs: [dependency-review, workflow-lint]
+        needs: [dependency-review, workflow-lint, website-image, outlook-addon-image]
         runs-on: ubuntu-latest
         timeout-minutes: 5
         permissions: {}

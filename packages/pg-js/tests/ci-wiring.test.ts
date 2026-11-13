@@ -1,18 +1,18 @@
 /**
  * What this repo's required checks are actually wired to (postguard-js#222).
  *
- * `main` pins twenty contexts by DISPLAY NAME, spread over seven of the eight
- * workflow files here (every one but `delivery.yml`), and until this file existed
+ * `main` pins eighteen contexts by DISPLAY NAME, spread over the workflow files
+ * here, and until this file existed
  * nothing in the repo read any of those names. That is the
- * encryption4all/postguard#299 vector twenty times over: branch protection
+ * encryption4all/postguard#299 vector eighteen times over: branch protection
  * matches a required check by its name, so renaming a job does not break its
  * gate — it silently
  * *disarms* it, leaving a context that no job produces.
  *
- * Where the twenty live is worth measuring rather than assuming, because it is
+ * Where the eighteen live is worth measuring rather than assuming, because it is
  * not where the sibling repo keeps its one. Classic protection here requires **no
  * status checks at all** — only one approving review, with `enforce_admins:
- * false`. All twenty come from the ruleset `main` (id 14326269), and that ruleset
+ * false`. All of the repo's own come from the ruleset `main` (id 14326269), and that ruleset
  * grants the `developers` team `bypass_mode: always`, so for anyone on that team
  * every one of them is advisory. That does not weaken the case for this file, it
  * is the case for it: a test runs on its own merits whether or not the
@@ -119,7 +119,7 @@ const workflowDir = (() => {
 /**
  * The contexts the ruleset `main` requires, by display name, plus the floor on
  * its approving review count — read from `.github/required-rules.json`, the
- * one place the twenty names live (postguard-js#274). That file is
+ * one place the names live (postguard-js#274). That file is
  * byte-sorted, not ordered the way the API returns them, so every comparison
  * against it (here, and in `scripts/ruleset-drift.mjs`, which reads the same
  * file to catch drift in the *live* ruleset) is against a set, never a
@@ -591,43 +591,140 @@ describe('release and publish wiring', () => {
    * so deriving them would publish to a name nothing deploys.
    */
   it('the published image names are the ones ops deploys', () => {
-    expect(workflow('website.yml').triggers).toContain(
-      'IMAGE: ghcr.io/privacybydesign/postguard-website'
-    );
+    const published: Array<[string, string, string]> = [
+      ['website.yml', 'image', 'ghcr.io/privacybydesign/postguard-website'],
+      ['outlook-addon.yml', 'image', 'ghcr.io/privacybydesign/postguard-outlook-addon'],
+      ['status-checks.yml', 'website-image', 'ghcr.io/privacybydesign/postguard-website'],
+      [
+        'status-checks.yml',
+        'outlook-addon-image',
+        'ghcr.io/privacybydesign/postguard-outlook-addon',
+      ],
+    ];
+    for (const [file, id, image] of published) {
+      // The shared workflow falls back to ghcr.io/<owner>/<repo> when no name is
+      // given, which is the `postguard-js` name nothing deploys.
+      expect(
+        job(file, id).body,
+        `${file}#${id} does not name its image, so the shared workflow would derive ` +
+          'ghcr.io/privacybydesign/postguard-js — a name nothing deploys'
+      ).toMatch(new RegExp(`^\\s*image-name: ${image}$`, 'm'));
+    }
+    // The release notes of the add-in name the image too.
     expect(workflow('outlook-addon.yml').triggers).toContain(
       'IMAGE: ghcr.io/privacybydesign/postguard-outlook-addon'
     );
-    for (const file of ['website.yml', 'outlook-addon.yml']) {
-      expect(
-        workflow(file).triggers,
-        `${file} derives its image name from \`github.repository\`, which resolves to ` +
-          'postguard-js here — that publishes to a name nothing deploys'
-      ).not.toMatch(/IMAGE:.*github\.repository/);
+  });
+
+  /**
+   * Every image job goes through the shared workflow, which builds once, scans,
+   * and only then pushes. A job that builds and pushes on its own skips that
+   * gate.
+   */
+  it('images are built and pushed only by the shared workflow', () => {
+    for (const candidate of workflows) {
+      for (const target of candidate.jobs) {
+        expect(
+          target.body,
+          `${candidate.file}#${target.id} builds an image itself, outside the shared ` +
+            'docker-publish workflow and its scan-before-push gate'
+        ).not.toMatch(/docker\/build-push-action|docker buildx|docker push/);
+      }
+    }
+    for (const [file, id] of [
+      ['website.yml', 'image'],
+      ['outlook-addon.yml', 'image'],
+      ['status-checks.yml', 'website-image'],
+      ['status-checks.yml', 'outlook-addon-image'],
+    ]) {
+      expect(job(file, id).body).toMatch(
+        /uses: privacybydesign\/github-workflows\/\.github\/workflows\/docker-publish\.yml@/
+      );
     }
   });
 
   /**
-   * The website publishes from main only. A PR builds the image (which is the
-   * part worth gating on) without a registry write, so this pair of guards is
-   * what keeps a pull request from pushing `:edge` over production.
+   * A pull request builds and scans both images (which is the part worth gating
+   * on) without a registry write, and that build sits behind the one context
+   * the organization requires. The publishing jobs run on a push only.
    */
-  it('the website image is built on a PR and pushed only from main', () => {
-    const build = job('website.yml', 'build');
-    expect(stepWith(build, 'push: false')).toContain("if: github.ref != 'refs/heads/main'");
-    expect(
-      stepWith(build, 'push-by-digest=true'),
-      'the website build pushes by digest without checking the branch, so a pull request ' +
-        'would write to the registry'
-    ).toContain("if: github.ref == 'refs/heads/main'");
+  it('images are checked on a PR and pushed only on a push', () => {
+    const passed = job('status-checks.yml', 'passed');
+    for (const id of ['website-image', 'outlook-addon-image']) {
+      const check = job('status-checks.yml', id);
+      expect(
+        check.body,
+        `status-checks.yml#${id} can push, so a pull request would write to the registry`
+      ).toMatch(/^\s*push-image: false$/m);
+      expect(check.condition, `status-checks.yml#${id} is conditional, so it can skip`).toBeNull();
+      expect(
+        passed.needs,
+        `\`Status checks passed\` does not wait for ${id}, so a broken image build would not block`
+      ).toContain(id);
+    }
 
-    const finalize = job('website.yml', 'finalize');
-    expect(finalize.needs, 'the manifest is assembled from digests the build job uploads').toEqual([
-      'build',
-    ]);
+    for (const file of ['website.yml', 'outlook-addon.yml']) {
+      const image = job(file, 'image');
+      // Against the body, not `condition`: the add-in's `if:` is a folded
+      // scalar, which the line-oriented reader returns as `>-`.
+      expect(image.condition, `${file}#image is unconditional`).not.toBeNull();
+      expect(
+        image.body,
+        `${file}#image is not limited to pushes, so a pull request run would publish`
+      ).toContain("github.event_name == 'push'");
+      expect(image.body, `${file}#image cannot push at all`).not.toContain('push-image: false');
+    }
+    // The only pushes that reach the workflows are main and the app's own tags.
+    expect(triggerBlock(workflow('website.yml'), 'push')).toContain('branches: [main]');
+    expect(triggerBlock(workflow('website.yml'), 'push') ?? '').not.toContain('tags:');
+  });
+
+  /**
+   * The add-in's version tag is cut by the shared workflow from the git tag. The
+   * prefix is what keeps another product's release from publishing this image,
+   * and what turns `outlook-addin-v1.2.0` into `:1.2.0`.
+   */
+  it('the add-in image release stays behind its own tag prefix', () => {
+    const image = job('outlook-addon.yml', 'image');
+    expect(image.body).toMatch(/^\s*tag-prefix: outlook-addin-$/m);
+    expect(triggerBlock(workflow('outlook-addon.yml'), 'push') ?? '').toContain(
+      "tags: ['outlook-addin-v*']"
+    );
     expect(
-      finalize.condition ?? '',
-      'the tagging job no longer restricts itself to main, so a PR run would tag `:edge`'
-    ).toContain("github.ref == 'refs/heads/main'");
+      image.needs,
+      'the add-in image no longer waits for its checks and the validated release manifest'
+    ).toEqual(['check', 'test', 'urls', 'nginx', 'target', 'manifest']);
+    for (const need of ['check', 'test', 'urls', 'nginx', 'target', 'manifest']) {
+      expect(
+        image.body,
+        `the add-in image condition does not look at \`${need}\`: with \`!cancelled()\` a ` +
+          'failed need no longer stops the publish on its own'
+      ).toContain(`needs.${need}.result == 'success'`);
+    }
+    expect(job('outlook-addon.yml', 'release').needs).toEqual(['target', 'image']);
+  });
+
+  /**
+   * The pull-request build of the add-in bakes in the production URLs, and it
+   * lives in a different file from the PROD_* values the release uses. A
+   * reusable workflow cannot read `env`, so the values are repeated; this holds
+   * the two copies together.
+   */
+  it('the add-in image check bakes in the production URLs', () => {
+    const env = workflow('outlook-addon.yml').triggers;
+    const value = (key: string) => {
+      const found = env.match(new RegExp(`^\\s*${key}:\\s*(\\S+)\\s*$`, 'm'))?.[1];
+      if (!found) throw new Error(`outlook-addon.yml has no ${key}`);
+      return found;
+    };
+    // Whole lines, so `https://postguard.eu` cannot pass for `https://postguard.eu/pkg`.
+    const lines = job('status-checks.yml', 'outlook-addon-image')
+      .body.split('\n')
+      .map((line) => line.trim());
+    expect(lines).toContain(`ADDIN_PUBLIC_URL=https://${value('PROD_ADDIN_HOST')}/`);
+    expect(lines).toContain(`PKG_URL=${value('PROD_PKG_URL')}`);
+    expect(lines).toContain(`CRYPTIFY_URL=${value('PROD_CRYPTIFY_URL')}`);
+    expect(lines).toContain(`POSTGUARD_WEBSITE_URL=${value('PROD_WEBSITE_URL')}`);
   });
 });
 
@@ -687,11 +784,6 @@ describe('the reader', () => {
         }
       }
     }
-
-    // The `include:` spelling. These two ARE required contexts and exist only
-    // after expansion, so `everyRequiredContextHasExactlyOneJob` covers them
-    // too; naming them here is what says which reader path that depends on.
-    expect(job('website.yml', 'build').contexts).toEqual(['Build (amd64)', 'Build (arm64)']);
 
     // The flow-list spelling (`node: ['22', '24']`), which no required context
     // exercises. Deliberately not pinned to the versions: the aggregate exists

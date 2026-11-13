@@ -46,7 +46,12 @@ RUN pnpm --filter @e4a/pg-js build \
  && pnpm --filter postguard-outlook-addin build
 
 ## Runtime stage ############################################################
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.30-alpine AS runtime
+
+# Take the security updates published since the base image was built. The
+# shared publish workflow scans the image and refuses one with a fixable
+# critical vulnerability.
+RUN apk upgrade --no-cache
 
 COPY apps/outlook-addon/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /repo/apps/outlook-addon/dist /usr/share/nginx/html

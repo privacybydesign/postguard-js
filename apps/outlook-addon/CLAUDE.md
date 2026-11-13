@@ -172,7 +172,7 @@ Format: `Outlook,<host-ver>,pg4ol,<ext-ver>`. The PKG's metrics middleware keys 
 
 ### Testing nginx config without Docker
 
-The runtime image is `nginx:1.27-alpine`; `nginx/default.conf` is copied to `/etc/nginx/conf.d/default.conf`, so it's included inside `http{}` (which is why top-level `map` directives are valid there). When Docker isn't available (no daemon, rootless docker blocked, no `apt`), you can still exercise the config:
+The runtime image is `nginx:1.30-alpine`; `nginx/default.conf` is copied to `/etc/nginx/conf.d/default.conf`, so it's included inside `http{}` (which is why top-level `map` directives are valid there). When Docker isn't available (no daemon, rootless docker blocked, no `apt`), you can still exercise the config:
 
 1. Build nginx from source to a user prefix, dropping modules that need PCRE/zlib dev headers (`--without-http_rewrite_module --without-http_gzip_module --without-http_upstream_zone_module`).
 2. Caveat: those `--without-*` flags drop the `return` directive and regex-map matching, so `nginx -t` on the verbatim config fails on those lines. That's a build limitation, not a config bug: wrap only the parts under test (exact-match maps + `add_header` need neither module) in a minimal `http{}` config and drive it with curl.

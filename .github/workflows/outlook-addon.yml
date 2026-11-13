@@ -256,66 +256,25 @@ jobs:
               with:
                   persist-credentials: false
             # Mirrors the Dockerfile, which serves nginx/default.conf from
-            # /etc/nginx/conf.d/default.conf on nginx:1.27-alpine, so the map
+            # /etc/nginx/conf.d/default.conf on nginx:1.30-alpine, so the map
             # blocks are validated in the real http{} context.
             - name: Validate nginx config (nginx -t)
               run: |
                   docker run --rm \
                     -v "${{ github.workspace }}/apps/outlook-addon/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro" \
-                    nginx:1.27-alpine nginx -t
+                    nginx:1.30-alpine nginx -t
 
-    # The `image` job below only runs on a push, so without this the Dockerfile is
-    # never built before merge — and this workflow's most invasive change is the
-    # Dockerfile: repo-root context, new COPY paths, and ARGs deliberately placed
-    # below `pnpm install`. Building without pushing gates that, needs no package
-    # write grant, and makes the ARG-placement cache win observable in CI rather
-    # than only on a laptop. `website.yml` does the same thing for the same reason.
-    docker:
-        name: Image builds (PR, no push)
-        if: github.event_name == 'pull_request'
-        runs-on: ubuntu-latest
-        defaults:
-            run:
-                working-directory: .
-        steps:
-            - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-              with:
-                  persist-credentials: false
-            - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-            - name: Build (validate only, no push)
-              uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-              with:
-                  context: .
-                  file: apps/outlook-addon/Dockerfile
-                  platforms: linux/amd64
-                  push: false
-                  # Production values: the build refuses staging fallbacks in
-                  # production mode, and the manifest transform fails when an
-                  # <AppDomain> the target needs is absent, so these are the values
-                  # worth exercising.
-                  build-args: |
-                      ADDIN_PUBLIC_URL=https://${{ env.PROD_ADDIN_HOST }}/
-                      PKG_URL=${{ env.PROD_PKG_URL }}
-                      CRYPTIFY_URL=${{ env.PROD_CRYPTIFY_URL }}
-                      POSTGUARD_WEBSITE_URL=${{ env.PROD_WEBSITE_URL }}
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
-
-    # Edge image on every push to main; the versioned image and the sideloadable
-    # manifest on an `outlook-addin-v*` tag. Context is the repo root: the app
-    # depends on @e4a/pg-js as workspace:*, so the image build has to install the
-    # workspace and build the SDK first (see apps/outlook-addon/Dockerfile).
-    image:
-        name: Image (${{ github.ref_type == 'tag' && 'release' || 'edge' }})
-        # Gated on every check. Without this the job publishes in parallel with
-        # them, so a red `urls` would not stop the same bundle shipping — which is
-        # precisely the failure this workflow exists to prevent.
-        needs: [check, test, urls, nginx]
+    # What a push publishes. A push to main is the edge image with the staging
+    # URLs baked in; an `outlook-addin-v*` tag is the versioned image with the
+    # production URLs. Its own job because a reusable workflow takes inputs, not
+    # steps, and cannot read `env`.
+    target:
+        name: Image target
         if: github.event_name == 'push'
         runs-on: ubuntu-latest
-        permissions:
-            contents: write
-            packages: write
+        outputs:
+            build-args: ${{ steps.target.outputs.build-args }}
+            version: ${{ steps.target.outputs.version }}
         defaults:
             run:
                 working-directory: .
@@ -323,14 +282,6 @@ jobs:
             - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
               with:
                   persist-credentials: false
-            - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-            - name: Log in to GHCR
-              uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
-              with:
-                  registry: ghcr.io
-                  username: ${{ github.actor }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
-
             - name: Resolve the target
               id: target
               shell: bash
@@ -342,53 +293,58 @@ jobs:
                       echo "::error::tag says $version, apps/outlook-addon says $declared" >&2
                       exit 1
                     fi
-                    {
-                      echo "tags=${IMAGE}:${version},${IMAGE}:latest"
-                      echo "addin_host=${PROD_ADDIN_HOST}"
-                      echo "pkg=${PROD_PKG_URL}"
-                      echo "cryptify=${PROD_CRYPTIFY_URL}"
-                      echo "website=${PROD_WEBSITE_URL}"
-                      echo "version=${version}"
-                    } >> "$GITHUB_OUTPUT"
+                    addin_host=$PROD_ADDIN_HOST pkg=$PROD_PKG_URL
+                    cryptify=$PROD_CRYPTIFY_URL website=$PROD_WEBSITE_URL
+                    echo "version=${version}" >> "$GITHUB_OUTPUT"
                   else
-                    {
-                      echo "tags=${IMAGE}:edge"
-                      echo "addin_host=${EDGE_ADDIN_HOST}"
-                      echo "pkg=${EDGE_PKG_URL}"
-                      echo "cryptify=${EDGE_CRYPTIFY_URL}"
-                      echo "website=${EDGE_WEBSITE_URL}"
-                    } >> "$GITHUB_OUTPUT"
+                    addin_host=$EDGE_ADDIN_HOST pkg=$EDGE_PKG_URL
+                    cryptify=$EDGE_CRYPTIFY_URL website=$EDGE_WEBSITE_URL
                   fi
+                  {
+                    echo 'build-args<<BUILD_ARGS_EOF'
+                    echo "ADDIN_PUBLIC_URL=https://${addin_host}/"
+                    echo "PKG_URL=${pkg}"
+                    echo "CRYPTIFY_URL=${cryptify}"
+                    echo "POSTGUARD_WEBSITE_URL=${website}"
+                    echo 'BUILD_ARGS_EOF'
+                  } >> "$GITHUB_OUTPUT"
 
-            # The production manifest is what admins sideload from, so it is
-            # attached to the release with a stable versioned URL rather than
-            # taken from whatever the addin host currently serves.
-            #
-            # Built and validated BEFORE the image is pushed. These four steps need
-            # nothing from the pushed image, and validation can genuinely fail:
-            # `office-addin-manifest validate` is a network call to Microsoft's
-            # acceptance-test service, so their outage is enough. With the push
-            # first, that left `:<version>` and `:latest` live with no release and
-            # no manifest attached — admins sideloading the old manifest against a
-            # new bundle, while sync-addons.mjs found nothing matching
-            # `outlook-addin-v*` and took its keep-serving path, so the website went
-            # on mirroring the pre-migration artifact with nothing recording the
-            # mismatch. Ordering costs no wall clock and makes the gate real.
+    # The production manifest is what admins sideload from, so it is attached to
+    # the release with a stable versioned URL rather than taken from whatever the
+    # addin host currently serves.
+    #
+    # Built and validated BEFORE the image is pushed: `image` needs this job.
+    # Validation can genuinely fail: `office-addin-manifest validate` is a network
+    # call to Microsoft's acceptance-test service, so their outage is enough. With
+    # the push first, that left `:<version>` and `:latest` live with no release
+    # and no manifest attached — admins sideloading the old manifest against a new
+    # bundle, while sync-addons.mjs found nothing matching `outlook-addin-v*` and
+    # took its keep-serving path, so the website went on mirroring the
+    # pre-migration artifact with nothing recording the mismatch.
+    manifest:
+        name: Release manifest
+        needs: target
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: .
+        steps:
+            - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+              with:
+                  persist-credentials: false
             - run: corepack enable
-              if: github.ref_type == 'tag'
             - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-              if: github.ref_type == 'tag'
               with:
                   node-version: 24
                   package-manager-cache: false
             - name: Build the production manifest
-              if: github.ref_type == 'tag'
               run: pnpm install --frozen-lockfile && pnpm --filter postguard-outlook-addin build
               env:
-                  ADDIN_PUBLIC_URL: https://${{ steps.target.outputs.addin_host }}/
-                  PKG_URL: ${{ steps.target.outputs.pkg }}
-                  CRYPTIFY_URL: ${{ steps.target.outputs.cryptify }}
-                  POSTGUARD_WEBSITE_URL: ${{ steps.target.outputs.website }}
+                  ADDIN_PUBLIC_URL: https://${{ env.PROD_ADDIN_HOST }}/
+                  PKG_URL: ${{ env.PROD_PKG_URL }}
+                  CRYPTIFY_URL: ${{ env.PROD_CRYPTIFY_URL }}
+                  POSTGUARD_WEBSITE_URL: ${{ env.PROD_WEBSITE_URL }}
             # The `check` job validates the edge- and production-configured
             # manifests it builds itself, not this one. This is the actual release
             # asset, and it differs from the edge copy in exactly what validation
@@ -396,36 +352,77 @@ jobs:
             # AppDomains. Validating it here is what makes "the file admins
             # sideload is validated" true of the released artifact.
             - name: Validate the manifest being released
-              if: github.ref_type == 'tag'
               run: pnpm --filter postguard-outlook-addin validate:dist
-
-            - name: Build and push
-              uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+            - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
-                  context: .
-                  file: apps/outlook-addon/Dockerfile
-                  # amd64 only, matching what the standalone repo actually
-                  # published. arm64 would be new here and nothing exercises it
-                  # before a tag: there is no setup-qemu-action, and an emulated
-                  # `webpack --mode production` over a WASM-embedding bundle is
-                  # slow and OOM-prone. Worth adding deliberately, with a build
-                  # that runs on PRs, rather than discovering it at release time.
-                  platforms: linux/amd64
-                  push: true
-                  tags: ${{ steps.target.outputs.tags }}
-                  build-args: |
-                      ADDIN_PUBLIC_URL=https://${{ steps.target.outputs.addin_host }}/
-                      PKG_URL=${{ steps.target.outputs.pkg }}
-                      CRYPTIFY_URL=${{ steps.target.outputs.cryptify }}
-                      POSTGUARD_WEBSITE_URL=${{ steps.target.outputs.website }}
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
-            - name: Create the release with the manifest attached
-              if: github.ref_type == 'tag'
+                  name: outlook-addin-manifest
+                  path: apps/outlook-addon/dist/manifest.xml
+                  if-no-files-found: error
+                  retention-days: 1
+
+    # Edge image on every push to main; the versioned image and `:latest` on an
+    # `outlook-addin-v*` tag. Through the shared workflow: the image is built
+    # once, scanned, and only then pushed. A pull request builds and scans the
+    # same Dockerfile in status-checks.yml, without a registry write. Context is
+    # the repo root: the app depends on @e4a/pg-js as workspace:*, so the image
+    # build has to install the workspace and build the SDK first (see
+    # apps/outlook-addon/Dockerfile).
+    #
+    # Gated on every check. Without this the job publishes in parallel with
+    # them, so a red `urls` would not stop the same bundle shipping — which is
+    # precisely the failure this workflow exists to prevent. `manifest` is
+    # skipped on a push to main, so the condition spells out which results are
+    # acceptable: a job with a skipped need is itself skipped by default.
+    #
+    # amd64 only, matching what the standalone repo actually published. arm64
+    # would be new here and nothing exercises it before a tag: an emulated
+    # `webpack --mode production` over a WASM-embedding bundle is slow and
+    # OOM-prone. Worth adding deliberately, with a build that runs on PRs, rather
+    # than discovering it at release time.
+    image:
+        name: Outlook add-in image
+        needs: [check, test, urls, nginx, target, manifest]
+        if: >-
+            !cancelled() && github.event_name == 'push'
+            && needs.check.result == 'success' && needs.test.result == 'success'
+            && needs.urls.result == 'success' && needs.nginx.result == 'success'
+            && needs.target.result == 'success'
+            && (needs.manifest.result == 'success' || (needs.manifest.result == 'skipped' && github.ref_type != 'tag'))
+        uses: privacybydesign/github-workflows/.github/workflows/docker-publish.yml@v1
+        permissions:
+            contents: read
+            packages: write
+            security-events: write
+            id-token: write
+            attestations: write
+        with:
+            image-name: ghcr.io/privacybydesign/postguard-outlook-addon
+            dockerfile: apps/outlook-addon/Dockerfile
+            platforms: linux/amd64
+            tag-prefix: outlook-addin-
+            tag-latest: true
+            build-args: ${{ needs.target.outputs.build-args }}
+
+    release:
+        name: Release with the manifest attached
+        needs: [target, image]
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        defaults:
+            run:
+                working-directory: .
+        steps:
+            - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+              with:
+                  name: outlook-addin-manifest
+            - name: Create the release
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  VERSION: ${{ needs.target.outputs.version }}
               run: |
-                  gh release create "$GITHUB_REF_NAME" \
-                    --title "Outlook add-in ${{ steps.target.outputs.version }}" \
-                    --notes "Sideload the attached manifest.xml, or pull ${IMAGE}:${{ steps.target.outputs.version }}." \
-                    apps/outlook-addon/dist/manifest.xml
+                  gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+                    --title "Outlook add-in ${VERSION}" \
+                    --notes "Sideload the attached manifest.xml, or pull ${IMAGE}:${VERSION}." \
+                    manifest.xml
