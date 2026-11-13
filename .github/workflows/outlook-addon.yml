@@ -388,7 +388,7 @@ jobs:
             && needs.urls.result == 'success' && needs.nginx.result == 'success'
             && needs.target.result == 'success'
             && (needs.manifest.result == 'success' || (needs.manifest.result == 'skipped' && github.ref_type != 'tag'))
-        uses: privacybydesign/github-workflows/.github/workflows/docker-publish.yml@e32021c23d7ce9a820642329705d826871aac323
+        uses: privacybydesign/github-workflows/.github/workflows/docker-publish.yml@v1
         permissions:
             contents: read
             packages: write

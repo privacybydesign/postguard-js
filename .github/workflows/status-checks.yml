@@ -38,7 +38,7 @@ jobs:
     # The two images, built and scanned without a registry write. The per-app
     # workflows publish them from main through the same shared workflow.
     website-image:
-        uses: privacybydesign/github-workflows/.github/workflows/docker-publish.yml@e32021c23d7ce9a820642329705d826871aac323
+        uses: privacybydesign/github-workflows/.github/workflows/docker-publish.yml@v1
         permissions:
             contents: read
             packages: write
@@ -56,7 +56,7 @@ jobs:
     # values in outlook-addon.yml; packages/pg-js/tests/ci-wiring.test.ts holds
     # the two in step.
     outlook-addon-image:
-        uses: privacybydesign/github-workflows/.github/workflows/docker-publish.yml@e32021c23d7ce9a820642329705d826871aac323
+        uses: privacybydesign/github-workflows/.github/workflows/docker-publish.yml@v1
         permissions:
             contents: read
             packages: write
