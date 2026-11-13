@@ -34,7 +34,7 @@ export function compareRules(expected, effectiveRules) {
     };
   }
 
-  // A real `main` here carries twenty required contexts today, so a live read
+  // A real `main` here carries eighteen required contexts today, so a live read
   // of zero rules is far more likely a wrong branch, wrong repo, or a
   // half-read response than every rule having been deleted at once. Treating
   // it as undetermined keeps that failure mode from paging someone to fix a

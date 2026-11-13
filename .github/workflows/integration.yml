@@ -297,7 +297,7 @@ jobs:
     # the required check no matter how loudly it fails. That is no longer left to
     # this comment: packages/pg-js/tests/ci-wiring.test.ts derives the lane set
     # from this file and fails until the new lane appears below — along with the
-    # rest of what `main`'s twenty required contexts are wired to (#222).
+    # rest of what `main`'s required contexts are wired to (#222).
     integration-complete:
         name: Integration complete
         needs: [node, envelope-compat, api-surface, bun, deno]
