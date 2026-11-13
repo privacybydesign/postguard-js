@@ -57,7 +57,7 @@ jobs:
         name: Canary scope is complete
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   persist-credentials: false
             # Named for what it asserts: both globs below are `examples/*` only.
@@ -159,11 +159,11 @@ jobs:
         if: github.event_name != 'pull_request'
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   persist-credentials: false
             - run: corepack enable
-            - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+            - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
               with:
                   node-version: 24
                   cache: pnpm
@@ -210,7 +210,7 @@ jobs:
             run:
                 working-directory: examples/pg-dotnet
         steps:
-            - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   persist-credentials: false
             - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
