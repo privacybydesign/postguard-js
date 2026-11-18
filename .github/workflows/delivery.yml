@@ -26,12 +26,41 @@ jobs:
             pull-requests: write
             id-token: write
         steps:
+            # The version commit is pushed and the Version Packages PR opened as
+            # the org's release App when its two secrets exist, and as
+            # GITHUB_TOKEN otherwise. Two things depend on the App:
+            # privacybydesign does not let GITHUB_TOKEN open a pull request at
+            # all, and a branch GITHUB_TOKEN pushed starts no workflows, so the
+            # PR would arrive with every required check absent. Secrets cannot
+            # be read in an `if:`, hence the step that turns one into an output.
+            - name: Check for the release App
+              id: app
+              env:
+                  APP_ID: ${{ secrets.RELEASE_APP_ID }}
+              run: echo "enabled=$([ -n "$APP_ID" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+            - name: Create the release App token
+              id: token
+              if: steps.app.outputs.enabled == 'true'
+              uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+              with:
+                  app-id: ${{ secrets.RELEASE_APP_ID }}
+                  private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+                  permission-contents: write
+                  permission-pull-requests: write
+                  permission-issues: write
+            - name: Warn that GITHUB_TOKEN opens the version PR
+              if: steps.app.outputs.enabled != 'true'
+              run: echo "::warning::RELEASE_APP_ID is not set, so the Version Packages PR is opened with GITHUB_TOKEN; where the organization forbids that, this job fails."
+
             # The checkout keeps its credentials on purpose: changesets pushes the
-            # version commit and its tags with them. This job uploads no artifacts.
+            # version commit and its tags with them, and that push has to come
+            # from the same identity that opens the PR. This job uploads no
+            # artifacts.
             - name: Checkout
               uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0 # zizmor: ignore[artipacked]
               with:
                   fetch-depth: 0
+                  token: ${{ steps.token.outputs.token || github.token }}
 
             - name: Setup pnpm
               run: corepack enable
@@ -46,10 +75,12 @@ jobs:
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
-            # The Version Packages PR this opens carries no pre-merge CI:
-            # GITHUB_TOKEN-triggered events start no workflows at all. The
-            # publish itself stays gated — `needs: integration` runs the full
-            # matrix on the version commit's push to main before this job.
+            # Opened by the release App, the Version Packages PR runs its
+            # checks like any other. Opened by GITHUB_TOKEN (no App secrets) it
+            # carries no pre-merge CI: GITHUB_TOKEN-triggered events start no
+            # workflows at all. Either way the publish stays gated — `needs:
+            # integration` runs the full matrix on the version commit's push to
+            # main before this job.
             #
             # A script, not changesets/action: that action is not on the
             # privacybydesign allowlist, and a workflow naming it never starts.
@@ -58,7 +89,7 @@ jobs:
             - name: Version or publish (changesets)
               run: scripts/changesets-release.sh
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ steps.token.outputs.token || secrets.GITHUB_TOKEN }}
                   # pnpm ignores publishConfig.provenance; the npm-config key
                   # is what `pnpm publish` (via changeset publish) reads.
                   NPM_CONFIG_PROVENANCE: 'true'
