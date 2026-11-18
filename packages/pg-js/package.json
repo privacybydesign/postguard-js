@@ -55,12 +55,12 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
-    "lint-staged": "^17.0.5",
+    "lint-staged": "^17.6.0",
     "pg-js-legacy-armor": "npm:@e4a/pg-js@0.10.0",
     "pg-js-reader-v1": "npm:@e4a/pg-js@1.11.0",
     "pg-js-reader-v2": "npm:@e4a/pg-js@2.3.4",
-    "prettier": "^3.9.6",
-    "tsdown": "^0.22.0",
+    "prettier": "^3.9.10",
+    "tsdown": "^0.23.7",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
   },
