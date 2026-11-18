@@ -2,7 +2,7 @@
 # @e4a/pg-js as `workspace:*`, so the whole workspace has to be installed for
 # that link to resolve.
 ## Build stage ##############################################################
-FROM node:24-alpine AS build
+FROM node:25-alpine AS build
 
 WORKDIR /repo
 
